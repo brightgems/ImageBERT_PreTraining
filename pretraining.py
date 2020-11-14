@@ -144,10 +144,10 @@ def train(
         count_steps+=1
         total_loss+=loss.item()
 
-        if batch_idx%logging_steps:
+        if batch_idx%logging_steps==0:
             logger.info("Step: {}\tLoss: {}".format(batch_idx,loss.item()))
 
-        return total_loss/count_steps
+    return total_loss/count_steps
 
 def main(
     context_dir:str,
@@ -179,10 +179,11 @@ def main(
     config=BertConfig.from_pretrained(pretrained_model_name)
     im_bert=ImageBertForPreTraining(config)
     im_bert.setup_image_bert(pretrained_model_name)
+    im_bert.to(device)
 
     #データセットとデータローダの作成
     logger.info("データセットを作成します。")
-    dataset=create_dataset(context_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir,10)
+    dataset=create_dataset(context_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir,1000)
 
     #Optimizerの作成
     optimizer=AdamW(im_bert.parameters(),lr=lr,eps=1e-8)
