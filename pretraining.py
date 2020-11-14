@@ -106,8 +106,11 @@ def train(
     optimizer:torch.optim.Optimizer,
     max_num_rois:int,
     roi_features_dim:int,
-    logging_steps:int=100):
+    logging_steps:int=100)->float:
     im_bert.train()
+
+    count_steps=0
+    total_loss=0
 
     for batch_idx,batch in enumerate(dataloader):
         roi_info=ibutil.load_roi_info_from_files(
@@ -137,6 +140,14 @@ def train(
         nn.utils.clip_grad_norm_(im_bert.parameters(), 1.0)
         # Update parameters
         optimizer.step()
+
+        count_steps+=1
+        total_loss+=loss.item()
+
+        if batch_idx%logging_steps:
+            logger.info("Step: {}\tLoss: {}".format(batch_idx,loss.item()))
+
+        return total_loss/count_steps
 
 def main(
     context_dir:str,
@@ -185,7 +196,7 @@ def main(
         dataloader=DataLoader(dataset,batch_size=batch_size,shuffle=True)
 
         #訓練
-        train(
+        mean_loss=train(
             im_bert,
             dataloader,
             optimizer,
@@ -193,6 +204,7 @@ def main(
             roi_features_dim,
             logging_steps=100
         )
+        logger.info("訓練時の平均損失: {}".format(mean_loss))
 
         #チェックポイントの保存
         checkpoint_filepath=os.path.join(result_save_dir,"checkpoint_{}.pt".format(epoch+1))

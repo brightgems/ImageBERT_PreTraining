@@ -123,7 +123,7 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         roi_boxes:torch.Tensor, #(N,max_num_rois,4)
         roi_features:torch.Tensor,  #(N,max_num_rois,roi_features_dim)
         roi_labels:torch.Tensor,    #(N,max_num_rois)
-        create_negative_prob:float=0.3):   
+        create_negative_prob:float=0.2):   
         """
         Image-Text Matching (ITM)を行うための負例を作成する。
 
