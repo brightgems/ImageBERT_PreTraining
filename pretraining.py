@@ -194,7 +194,7 @@ def main(
 
         logger.info("{}からチェックポイントを読み込みます。".format(checkpoint_filepath))
 
-        parameters=torch.load(checkpoint_filepath).to(device)
+        parameters=torch.load(checkpoint_filepath,map_location=device)
         im_bert.load_state_dict(parameters)
 
     #データセットとデータローダの作成
@@ -206,7 +206,7 @@ def main(
     
     #訓練ループ
     logger.info("モデルの訓練を開始します。")
-    start_epoch=0 if resume_epoch is not None else resume_epoch
+    start_epoch=0 if resume_epoch is None else resume_epoch
     for epoch in range(start_epoch,num_epochs):
         logger.info("===== {}/{} =====".format(epoch,num_epochs-1))
 
@@ -243,7 +243,7 @@ if __name__=="__main__":
     parser.add_argument("--lr",type=float)
     parser.add_argument("--create_negative_prob",type=float)
     parser.add_argument("--result_save_dir",type=str)
-    parser.add_argument("--resume_epoch",type=str)
+    parser.add_argument("--resume_epoch",type=int)
     
     args=parser.parse_args()
 
