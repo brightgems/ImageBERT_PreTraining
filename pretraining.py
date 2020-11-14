@@ -106,6 +106,7 @@ def train(
     optimizer:torch.optim.Optimizer,
     max_num_rois:int,
     roi_features_dim:int,
+    create_negative_prob:float,
     logging_steps:int=100)->float:
     im_bert.train()
 
@@ -127,6 +128,7 @@ def train(
             "roi_boxes":roi_info["roi_boxes"].to(device),
             "roi_features":roi_info["roi_features"].to(device),
             "roi_labels":roi_info["roi_labels"].to(device),
+            "create_negative_prob":create_negative_prob,
             "return_dict":True
         }
 
@@ -159,6 +161,7 @@ def main(
     batch_size:int,
     num_epochs:int,
     lr:float,
+    create_negative_prob:float,
     result_save_dir:str):
     logger.info("context_dir: {}".format(context_dir))
     logger.info("roi_boxes_dir: {}".format(roi_boxes_dir))
@@ -169,6 +172,7 @@ def main(
     logger.info("バッチサイズ: {}".format(batch_size))
     logger.info("エポック数: {}".format(num_epochs))
     logger.info("学習率: {}".format(lr))
+    logger.info("create_negative_prob: {}".format(create_negative_prob))
 
     logger.info("結果は{}に保存されます。".format(result_save_dir))
     os.makedirs(result_save_dir,exist_ok=True)
@@ -183,7 +187,7 @@ def main(
 
     #データセットとデータローダの作成
     logger.info("データセットを作成します。")
-    dataset=create_dataset(context_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir,1000)
+    dataset=create_dataset(context_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir)
 
     #Optimizerの作成
     optimizer=AdamW(im_bert.parameters(),lr=lr,eps=1e-8)
@@ -223,6 +227,7 @@ if __name__=="__main__":
     parser.add_argument("--batch_size",type=int)
     parser.add_argument("--num_epochs",type=int)
     parser.add_argument("--lr",type=float)
+    parser.add_argument("--create_negative_prob",type=float)
     parser.add_argument("--result_save_dir",type=str)
     
     args=parser.parse_args()
@@ -237,5 +242,6 @@ if __name__=="__main__":
         args.batch_size,
         args.num_epochs,
         args.lr,
+        args.create_negative_prob,
         args.result_save_dir
     )

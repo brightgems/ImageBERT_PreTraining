@@ -123,7 +123,7 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         roi_boxes:torch.Tensor, #(N,max_num_rois,4)
         roi_features:torch.Tensor,  #(N,max_num_rois,roi_features_dim)
         roi_labels:torch.Tensor,    #(N,max_num_rois)
-        create_negative_prob:float=0.2):   
+        create_negative_prob:float):   
         """
         Image-Text Matching (ITM)を行うための負例を作成する。
 
@@ -178,6 +178,7 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         roi_boxes:torch.Tensor,    #(N,max_num_rois,4)
         roi_features:torch.Tensor,  #(N,max_num_rois,roi_features_dim)
         roi_labels:torch.Tensor,    #(N,max_num_rois)
+        create_negative_prob:float=0.2,
         output_hidden_states:bool=None,
         return_dict:bool=None):
         """
@@ -189,7 +190,7 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         max_num_rois=roi_boxes.size(1)
 
         #入力サンプルの作成
-        samples=self.__create_negative_samples(input_ids,roi_boxes,roi_features,roi_labels)
+        samples=self.__create_negative_samples(input_ids,roi_boxes,roi_features,roi_labels,create_negative_prob)
         input_ids=samples["input_ids"]
         roi_boxes=samples["roi_boxes"]
         roi_features=samples["roi_features"]
