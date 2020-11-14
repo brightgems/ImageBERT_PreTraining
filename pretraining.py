@@ -162,7 +162,8 @@ def main(
     num_epochs:int,
     lr:float,
     create_negative_prob:float,
-    result_save_dir:str):
+    result_save_dir:str,
+    resume_checkpoint_filepath:str):
     logger.info("context_dir: {}".format(context_dir))
     logger.info("roi_boxes_dir: {}".format(roi_boxes_dir))
     logger.info("roi_features_dir: {}".format(roi_features_dir))
@@ -184,6 +185,13 @@ def main(
     im_bert=ImageBertForPreTraining(config)
     im_bert.setup_image_bert(pretrained_model_name)
     im_bert.to(device)
+
+    #学習を再開する場合
+    if resume_checkpoint_filepath is not None:
+        logger.info("{}からチェックポイントを読み込みます。".format(resume_checkpoint_filepath))
+
+        parameters=torch.load(resume_checkpoint_filepath).to(device)
+        im_bert.load_state_dict(parameters)
 
     #データセットとデータローダの作成
     logger.info("データセットを作成します。")
@@ -207,6 +215,7 @@ def main(
             optimizer,
             max_num_rois,
             roi_features_dim,
+            create_negative_prob,
             logging_steps=100
         )
         logger.info("訓練時の平均損失: {}".format(mean_loss))
@@ -229,6 +238,7 @@ if __name__=="__main__":
     parser.add_argument("--lr",type=float)
     parser.add_argument("--create_negative_prob",type=float)
     parser.add_argument("--result_save_dir",type=str)
+    parser.add_argument("--resume_checkpoint_filepath",type=str)
     
     args=parser.parse_args()
 
@@ -243,5 +253,6 @@ if __name__=="__main__":
         args.num_epochs,
         args.lr,
         args.create_negative_prob,
-        args.result_save_dir
+        args.result_save_dir,
+        args.resume_checkpoint_filepath
     )
