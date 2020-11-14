@@ -163,7 +163,7 @@ def main(
     lr:float,
     create_negative_prob:float,
     result_save_dir:str,
-    resume_checkpoint_filepath:str):
+    resume_epoch:int):
     logger.info("context_dir: {}".format(context_dir))
     logger.info("roi_boxes_dir: {}".format(roi_boxes_dir))
     logger.info("roi_features_dir: {}".format(roi_features_dir))
@@ -187,10 +187,14 @@ def main(
     im_bert.to(device)
 
     #学習を再開する場合
-    if resume_checkpoint_filepath is not None:
-        logger.info("{}からチェックポイントを読み込みます。".format(resume_checkpoint_filepath))
+    if resume_epoch is not None:
+        checkpoint_filepath=os.path.join(result_save_dir,"checkpoint_{}.pt".format(resume_epoch-1))
+        if os.path.exists(checkpoint_filepath)==False:
+            raise RuntimeError("チェックポイントが存在しません。")
 
-        parameters=torch.load(resume_checkpoint_filepath).to(device)
+        logger.info("{}からチェックポイントを読み込みます。".format(checkpoint_filepath))
+
+        parameters=torch.load(checkpoint_filepath).to(device)
         im_bert.load_state_dict(parameters)
 
     #データセットとデータローダの作成
@@ -202,8 +206,9 @@ def main(
     
     #訓練ループ
     logger.info("モデルの訓練を開始します。")
-    for epoch in range(num_epochs):
-        logger.info("===== {}/{} =====".format(epoch+1,num_epochs))
+    start_epoch=0 if resume_epoch is not None else resume_epoch
+    for epoch in range(start_epoch,num_epochs):
+        logger.info("===== {}/{} =====".format(epoch,num_epochs-1))
 
         #データローダの作成
         dataloader=DataLoader(dataset,batch_size=batch_size,shuffle=True)
@@ -221,7 +226,7 @@ def main(
         logger.info("訓練時の平均損失: {}".format(mean_loss))
 
         #チェックポイントの保存
-        checkpoint_filepath=os.path.join(result_save_dir,"checkpoint_{}.pt".format(epoch+1))
+        checkpoint_filepath=os.path.join(result_save_dir,"checkpoint_{}.pt".format(epoch))
         torch.save(im_bert.state_dict(),checkpoint_filepath)
 
 if __name__=="__main__":
@@ -238,7 +243,7 @@ if __name__=="__main__":
     parser.add_argument("--lr",type=float)
     parser.add_argument("--create_negative_prob",type=float)
     parser.add_argument("--result_save_dir",type=str)
-    parser.add_argument("--resume_checkpoint_filepath",type=str)
+    parser.add_argument("--resume_epoch",type=str)
     
     args=parser.parse_args()
 
@@ -254,5 +259,5 @@ if __name__=="__main__":
         args.lr,
         args.create_negative_prob,
         args.result_save_dir,
-        args.resume_checkpoint_filepath
+        args.resume_epoch
     )
