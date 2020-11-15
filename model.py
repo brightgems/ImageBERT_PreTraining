@@ -9,9 +9,7 @@ from transformers import(
 from transformers.modeling_bert import BertPreTrainingHeads
 from typing import Tuple
 
-from imagebert.models import ImageBertModel
-
-BERT_MAX_SEQ_LENGTH=512 #BERTに入力するシーケンスの最大長
+from imagebert.model import ImageBertModel,BERT_MAX_SEQ_LENGTH
 
 class ImageBertForPreTraining(BertPreTrainedModel):
     """
