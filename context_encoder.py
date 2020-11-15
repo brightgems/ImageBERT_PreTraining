@@ -1,5 +1,6 @@
 import argparse
 import gzip
+import hashlib
 import json
 import logging
 import os
@@ -9,13 +10,13 @@ from tqdm import tqdm
 from transformers import BertJapaneseTokenizer
 from typing import Dict,List
 
-sys.path.append(".")
-import hashing
-
 logging_fmt="%(asctime)s %(levelname)s: %(message)s"
 logging.basicConfig(format=logging_fmt)
 logger=logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
+
+def get_md5_hash(v:str)->str:
+    return hashlib.md5(v.encode()).hexdigest()
 
 def load_contexts(context_filepath:str)->Dict[str,str]:
     """
@@ -57,7 +58,7 @@ def encode_contexts(
 
         input_ids=encoding["input_ids"].view(-1)
 
-        title_hash=hashing.get_md5_hash(title)
+        title_hash=get_md5_hash(title)
         save_filepath=os.path.join(save_dir,title_hash+".pt")
         torch.save(input_ids,save_filepath)
 
