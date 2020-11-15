@@ -126,12 +126,11 @@ def load_roi_info_from_files(
             roi_boxes=imbutils.load_roi_boxes_from_file(roi_boxes_filepaths[i],max_num_rois)
             roi_features=imbutils.load_roi_features_from_file(roi_features_filepaths[i],max_num_rois)
             roi_labels=imbutils.load_roi_labels_from_file(roi_labels_filepaths[i],max_num_rois)
-        #存在しない場合には0ベクトルを作成する。
         else:
             roi_boxes=torch.zeros(max_num_rois,4)
             roi_features=torch.zeros(max_num_rois,roi_features_dim)
             roi_labels=torch.zeros(max_num_rois,dtype=torch.long)
-
+        
         ret_roi_boxes[i]=roi_boxes
         ret_roi_features[i]=roi_features
         ret_roi_labels[i]=roi_labels
@@ -180,32 +179,34 @@ def train(
         outputs=im_bert(**inputs)
         loss=outputs["loss"]
         #Backward propagation
-        loss.backward()
+        loss.mean().backward()
         nn.utils.clip_grad_norm_(im_bert.parameters(), 1.0)
         # Update parameters
         optimizer.step()
 
         count_steps+=1
-        total_loss+=loss.item()
+        total_loss+=loss.mean().item()
 
         if batch_idx%logging_steps==0:
-            logger.info("Step: {}\tLoss: {}".format(batch_idx,loss.item()))
+            logger.info("Step: {}\tLoss: {}".format(batch_idx,loss.mean().item()))
 
     return total_loss/count_steps
 
-def main(
-    context_dir:str,
-    roi_boxes_dir:str,
-    roi_features_dir:str,
-    roi_labels_dir:str,
-    max_num_rois:int,
-    roi_features_dim:int,
-    batch_size:int,
-    num_epochs:int,
-    lr:float,
-    create_negative_prob:float,
-    result_save_dir:str,
-    resume_epoch:int):
+def main(args):
+    context_dir:str=args.context_dir
+    roi_boxes_dir:str=args.roi_boxes_dir
+    roi_features_dir:str=args.roi_features_dir
+    roi_labels_dir:str=args.roi_labels_dir
+    max_num_rois:int=args.max_num_rois
+    roi_features_dim:int=args.roi_features_dim
+    batch_size:int=args.batch_size
+    num_epochs:int=args.num_epochs
+    lr:float=args.lr
+    create_negative_prob:float=args.create_negative_prob
+    result_save_dir:str=args.result_save_dir
+    resume_epoch:int=args.resume_epoch
+    use_multi_gpus:bool=args.use_multi_gpus
+
     logger.info("context_dir: {}".format(context_dir))
     logger.info("roi_boxes_dir: {}".format(roi_boxes_dir))
     logger.info("roi_features_dir: {}".format(roi_features_dir))
@@ -228,6 +229,11 @@ def main(
     im_bert.setup_image_bert(pretrained_model_name)
     im_bert.to(device)
 
+    if use_multi_gpus:
+        logger.info("複数のGPUを使用して学習を行います。")
+        im_bert=nn.DataParallel(im_bert)
+        torch.backends.cudnn.benchmark=True
+
     #学習を再開する場合
     if resume_epoch is not None:
         checkpoint_filepath=os.path.join(result_save_dir,"checkpoint_{}.pt".format(resume_epoch-1))
@@ -241,7 +247,7 @@ def main(
 
     #データセットとデータローダの作成
     logger.info("データセットを作成します。")
-    dataset=create_dataset(context_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir)
+    dataset=create_dataset(context_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir,100)
 
     #Optimizerの作成
     optimizer=AdamW(im_bert.parameters(),lr=lr,eps=1e-8)
@@ -273,7 +279,6 @@ def main(
 
 if __name__=="__main__":
     parser=argparse.ArgumentParser()
-
     parser.add_argument("--context_dir",type=str)
     parser.add_argument("--roi_boxes_dir",type=str)
     parser.add_argument("--roi_features_dir",type=str)
@@ -286,20 +291,7 @@ if __name__=="__main__":
     parser.add_argument("--create_negative_prob",type=float)
     parser.add_argument("--result_save_dir",type=str)
     parser.add_argument("--resume_epoch",type=int)
-    
+    parser.add_argument("--use_multi_gpus",action="store_true")
     args=parser.parse_args()
 
-    main(
-        args.context_dir,
-        args.roi_boxes_dir,
-        args.roi_features_dir,
-        args.roi_labels_dir,
-        args.max_num_rois,
-        args.roi_features_dim,
-        args.batch_size,
-        args.num_epochs,
-        args.lr,
-        args.create_negative_prob,
-        args.result_save_dir,
-        args.resume_epoch
-    )
+    main(args)

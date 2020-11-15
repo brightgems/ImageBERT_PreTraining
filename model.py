@@ -54,7 +54,7 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         """
         返されるTensorはRoI部分を考慮してTruncateされたもの
         """
-        device=input_ids.device
+        device=self.fc_mrfr.weight.device
         batch_size=input_ids.size(0)
 
         masked_token_ids=input_ids.detach().clone()
@@ -88,7 +88,7 @@ class ImageBertForPreTraining(BertPreTrainedModel):
     def __create_masked_roi_labels_and_masked_oc_labels(
         self,
         roi_labels:torch.Tensor)->Tuple[torch.Tensor,torch.Tensor]:
-        device=roi_labels.device
+        device=self.fc_mrfr.weight.device
         batch_size=roi_labels.size(0)
         max_num_rois=roi_labels.size(1)
 
@@ -134,12 +134,14 @@ class ImageBertForPreTraining(BertPreTrainedModel):
 
         作成された例はDict形式で返される。
         """
+        device=self.fc_mrfr.weight.device
+
         if random.random()>create_negative_prob:
             ret={
-                "input_ids":input_ids,
-                "roi_boxes":roi_boxes,
-                "roi_features":roi_features,
-                "roi_labels":roi_labels,
+                "input_ids":input_ids.to(device),
+                "roi_boxes":roi_boxes.to(device),
+                "roi_features":roi_features.to(device),
+                "roi_labels":roi_labels.to(device),
                 "is_negative":False
             }
             return ret
@@ -162,10 +164,10 @@ class ImageBertForPreTraining(BertPreTrainedModel):
                 roi_labels[i]=roi_labels[i+1]
 
         ret={
-            "input_ids":input_ids,
-            "roi_boxes":roi_boxes,
-            "roi_features":roi_features,
-            "roi_labels":roi_labels,
+            "input_ids":input_ids.to(device),
+            "roi_boxes":roi_boxes.to(device),
+            "roi_features":roi_features.to(device),
+            "roi_labels":roi_labels.to(device),
             "is_negative":True
         }
         return ret
@@ -182,7 +184,7 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         """
         roi_labelsはFaster R-CNNで検出されたRoIのクラス
         """
-        device=input_ids.device
+        device=self.fc_mrfr.weight.device
 
         batch_size=roi_features.size(0)
         max_num_rois=roi_boxes.size(1)
