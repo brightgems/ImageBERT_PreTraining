@@ -247,7 +247,7 @@ def main(args):
 
     #データセットとデータローダの作成
     logger.info("データセットを作成します。")
-    dataset=create_dataset(context_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir,100)
+    dataset=create_dataset(context_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir)
 
     #Optimizerの作成
     optimizer=AdamW(im_bert.parameters(),lr=lr,eps=1e-8)
