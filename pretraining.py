@@ -12,7 +12,7 @@ from tqdm import tqdm
 from transformers import AdamW,BertConfig
 from typing import List
 
-import imagebert.util as ibutil
+import imagebert.utils as imbutils
 
 import sys
 sys.path.append(".")
@@ -100,6 +100,49 @@ def create_dataset(
 
     return dataset
 
+def load_roi_info_from_files(
+    roi_boxes_filepaths:List[str],
+    roi_features_filepaths:List[str],
+    roi_labels_filepaths:List[str],
+    max_num_rois:int,
+    roi_features_dim:int):
+    """
+    RoI情報をファイルから読み込む。
+    """
+    batch_size=len(roi_boxes_filepaths)
+    if len(roi_features_filepaths)!=batch_size or len(roi_labels_filepaths)!=batch_size:
+        raise RuntimeError("リストに含まれる要素数が不正です。")
+
+    ret_roi_boxes=torch.empty(batch_size,max_num_rois,4)
+    ret_roi_features=torch.empty(batch_size,max_num_rois,roi_features_dim)
+    ret_roi_labels=torch.empty(batch_size,max_num_rois,dtype=torch.long)
+
+    for i in range(batch_size):
+        roi_boxes=None
+        roi_features=None
+        roi_labels=None
+        #RoIの情報が存在する場合はそれを読み込む。
+        if os.path.exists(roi_boxes_filepaths[i]):
+            roi_boxes=imbutils.load_roi_boxes_from_file(roi_boxes_filepaths[i],max_num_rois)
+            roi_features=imbutils.load_roi_features_from_file(roi_features_filepaths[i],max_num_rois)
+            roi_labels=imbutils.load_roi_labels_from_file(roi_labels_filepaths[i],max_num_rois)
+        #存在しない場合には0ベクトルを作成する。
+        else:
+            roi_boxes=torch.zeros(max_num_rois,4)
+            roi_features=torch.zeros(max_num_rois,roi_features_dim)
+            roi_labels=torch.zeros(max_num_rois,dtype=torch.long)
+
+        ret_roi_boxes[i]=roi_boxes
+        ret_roi_features[i]=roi_features
+        ret_roi_labels[i]=roi_labels
+
+    ret={
+        "roi_boxes":ret_roi_boxes,
+        "roi_features":ret_roi_features,
+        "roi_labels":ret_roi_labels
+    }
+    return ret
+
 def train(
     im_bert:ImageBertForPreTraining,
     dataloader:DataLoader,
@@ -114,13 +157,12 @@ def train(
     total_loss=0
 
     for batch_idx,batch in enumerate(dataloader):
-        roi_info=ibutil.load_roi_info_from_files(
+        roi_info=load_roi_info_from_files(
             batch["roi_boxes_filepath"],
             batch["roi_features_filepath"],
             batch["roi_labels_filepath"],
             max_num_rois,
             roi_features_dim,
-            device
         )
 
         inputs={
