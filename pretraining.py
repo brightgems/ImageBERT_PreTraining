@@ -189,16 +189,17 @@ def train(
         outputs=im_bert(**inputs)
         loss=outputs["loss"]
         #Backward propagation
-        loss.mean().backward()
+        loss=loss.mean()
+        loss.backward()
         nn.utils.clip_grad_norm_(im_bert.parameters(), 1.0)
         # Update parameters
         optimizer.step()
 
         count_steps+=1
-        total_loss+=loss.mean().item()
+        total_loss+=loss.item()
 
         if batch_idx%logging_steps==0:
-            logger.info("Step: {}\tLoss: {}".format(batch_idx,loss.mean().item()))
+            logger.info("Step: {}\tLoss: {}".format(batch_idx,loss.item()))
 
     return total_loss/count_steps
 
