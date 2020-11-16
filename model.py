@@ -240,18 +240,16 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         itm_loss=criterion_ce(seq_relationship_score.view(-1,2),itm_labels.view(-1))
 
         #Masked Region Feature Regression (MRFR)
-        #正例についてのみ計算を行う。
         mrfr_loss=0
-        if is_negative==False:
-            for i in range(batch_size):
-                for j in range(BERT_MAX_SEQ_LENGTH-max_num_rois,BERT_MAX_SEQ_LENGTH):
-                    #マスクされているRoIトークンについてLossを計算する。
-                    if masked_lm_oc_labels[i,j]!=-100:
-                        input=sequence_output[i,j]
-                        input=self.fc_mrfr(input)
-                        target=roi_features[i,j-(BERT_MAX_SEQ_LENGTH-max_num_rois)]
+        for i in range(batch_size):
+            for j in range(BERT_MAX_SEQ_LENGTH-max_num_rois,BERT_MAX_SEQ_LENGTH):
+                #マスクされているRoIトークンについてLossを計算する。
+                if masked_lm_oc_labels[i,j]!=-100:
+                    input=sequence_output[i,j]
+                    input=self.fc_mrfr(input)
+                    target=roi_features[i,j-(BERT_MAX_SEQ_LENGTH-max_num_rois)]
 
-                        mrfr_loss+=criterion_mse(input,target)
+                    mrfr_loss+=criterion_mse(input,target)
 
         total_loss=masked_lm_oc_loss+itm_loss+mrfr_loss
 
