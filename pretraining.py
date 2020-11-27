@@ -11,7 +11,7 @@ from torch.utils.data import(
     DataLoader
 )
 from tqdm import tqdm
-from transformers import AdamW,BertConfig
+from transformers import AdamW,BertConfig,BertJapaneseTokenizer
 from typing import List
 
 import imagebert.utils as imbutils
@@ -217,6 +217,7 @@ def main(args):
     result_save_dir:str=args.result_save_dir
     resume_epoch:int=args.resume_epoch
     use_multi_gpus:bool=args.use_multi_gpus
+    init_params_from_pretrained_bert:bool=args.init_params_from_pretrained_bert
 
     logger.info("context_dir: {}".format(context_dir))
     logger.info("roi_boxes_dir: {}".format(roi_boxes_dir))
@@ -233,11 +234,18 @@ def main(args):
     os.makedirs(result_save_dir,exist_ok=True)
 
     #ImageBERTモデルの作成
+    im_bert=None
     pretrained_model_name="cl-tohoku/bert-base-japanese-whole-word-masking"
-    logger.info("{}から事前学習済みの重みを読み込みます。".format(pretrained_model_name))
-    config=BertConfig.from_pretrained(pretrained_model_name)
-    im_bert=ImageBertForPreTraining(config)
-    im_bert.setup_image_bert(pretrained_model_name)
+    if init_params_from_pretrained_bert:
+        logger.info("{}から事前学習済みの重みを読み込みます。".format(pretrained_model_name))
+        config=BertConfig.from_pretrained(pretrained_model_name)
+        im_bert=ImageBertForPreTraining(config)
+        im_bert.setup_image_bert(pretrained_model_name)
+    else:
+        config=BertConfig.from_pretrained(pretrained_model_name)
+        im_bert=ImageBertForPreTraining(config)
+        tokenizer=BertJapaneseTokenizer.from_pretrained(pretrained_model_name)
+        im_bert.set_mask_token_id(tokenizer.mask_token_id)
     im_bert.to(device)
 
     if use_multi_gpus:
@@ -303,6 +311,7 @@ if __name__=="__main__":
     parser.add_argument("--result_save_dir",type=str)
     parser.add_argument("--resume_epoch",type=int)
     parser.add_argument("--use_multi_gpus",action="store_true")
+    parser.add_argument("--init_params_from_pretrained_bert",action="store_true")
     args=parser.parse_args()
 
     main(args)
