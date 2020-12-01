@@ -42,7 +42,7 @@ class ImageBertDataset(Dataset):
     コンテキストのTensorはこのデータセットに保存しておくが、
     RoIの特徴量はサイズが大きすぎるので、実行時にファイルパスを参照して随時読み込む。
     """
-    def __init__(self,roi_boxes_dir:str,roi_features_dir:str,roi_labels_dir:str):
+    def __init__(self,roi_boxes_dir:str,roi_features_dir:str,roi_labels_dir:str,is_mscoco:bool=False):
         self.input_ids_list:List[torch.Tensor]=[]
         self.roi_boxes_filepaths:List[str]=[]
         self.roi_features_filepaths:List[str]=[]
@@ -51,6 +51,7 @@ class ImageBertDataset(Dataset):
         self.roi_boxes_dir=roi_boxes_dir
         self.roi_features_dir=roi_features_dir
         self.roi_labels_dir=roi_labels_dir
+        self.is_mscoco=is_mscoco
 
     def __len__(self):
         return len(self.input_ids_list)
@@ -83,16 +84,24 @@ class ImageBertDataset(Dataset):
         roi_features_filepath=os.path.join(self.roi_features_dir,title_hash+".pt")
         roi_labels_filepath=os.path.join(self.roi_labels_dir,title_hash+".pt")
 
-        self.input_ids_list.append(input_ids)
-        self.roi_boxes_filepaths.append(roi_boxes_filepath)
-        self.roi_features_filepaths.append(roi_features_filepath)
-        self.roi_labels_filepaths.append(roi_labels_filepath)
+        if self.is_mscoco:
+            for i in range(5):
+                self.input_ids_list.append(input_ids[i])
+                self.roi_boxes_filepaths.append(roi_boxes_filepath)
+                self.roi_features_filepaths.append(roi_features_filepath)
+                self.roi_labels_filepaths.append(roi_labels_filepath)
+        else:
+            self.input_ids_list.append(input_ids)
+            self.roi_boxes_filepaths.append(roi_boxes_filepath)
+            self.roi_features_filepaths.append(roi_features_filepath)
+            self.roi_labels_filepaths.append(roi_labels_filepath)
 
 def create_dataset(
     context_dir:str,
     roi_boxes_dir:str,
     roi_features_dir:str,
     roi_labels_dir:str,
+    is_mscoco:bool,
     num_examples:int=-1)->ImageBertDataset:
     """
     データセットを作成する。
@@ -101,7 +110,7 @@ def create_dataset(
     context_files=glob.glob(pathname)
     logger.info("コンテキストの数: {}".format(len(context_files)))
 
-    dataset=ImageBertDataset(roi_boxes_dir,roi_features_dir,roi_labels_dir)
+    dataset=ImageBertDataset(roi_boxes_dir,roi_features_dir,roi_labels_dir,is_mscoco=is_mscoco)
     for i,context_file in tqdm(enumerate(context_files),total=len(context_files)):
         if num_examples>=0 and i>=num_examples:
             break
@@ -218,6 +227,7 @@ def main(args):
     resume_epoch:int=args.resume_epoch
     use_multi_gpus:bool=args.use_multi_gpus
     no_init_params_from_pretrained_bert:bool=args.no_init_params_from_pretrained_bert
+    is_mscoco:bool=args.is_mscoco
 
     logger.info("context_dir: {}".format(context_dir))
     logger.info("roi_boxes_dir: {}".format(roi_boxes_dir))
@@ -265,7 +275,7 @@ def main(args):
 
     #データセットとデータローダの作成
     logger.info("データセットを作成します。")
-    dataset=create_dataset(context_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir)
+    dataset=create_dataset(context_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir,is_mscoco)
 
     #Optimizerの作成
     optimizer=AdamW(im_bert.parameters(),lr=lr,eps=1e-8)
@@ -311,6 +321,7 @@ if __name__=="__main__":
     parser.add_argument("--resume_epoch",type=int)
     parser.add_argument("--use_multi_gpus",action="store_true")
     parser.add_argument("--no_init_params_from_pretrained_bert",action="store_true")
+    parser.add_argument("--is_mscoco",action="store_true")
     args=parser.parse_args()
 
     main(args)
