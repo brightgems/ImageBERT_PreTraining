@@ -4,11 +4,10 @@ import hashlib
 import json
 import logging
 import os
-import sys
 import torch
 from tqdm import tqdm
 from transformers import BertJapaneseTokenizer
-from typing import Dict,List
+from typing import Dict
 
 logging_fmt="%(asctime)s %(levelname)s: %(message)s"
 logging.basicConfig(format=logging_fmt)
@@ -79,7 +78,4 @@ if __name__=="__main__":
     parser.add_argument("--save_dir",type=str)
     args=parser.parse_args()
 
-    main(
-        args.context_filepath,
-        args.save_dir
-    )
+    main(args.context_filepath,args.save_dir)
