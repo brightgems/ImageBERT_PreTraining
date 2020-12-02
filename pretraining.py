@@ -228,6 +228,7 @@ def main(args):
     use_multi_gpus:bool=args.use_multi_gpus
     no_init_params_from_pretrained_bert:bool=args.no_init_params_from_pretrained_bert
     is_stair_captions:bool=args.is_stair_captions
+    num_examples:int=args.num_examples
 
     logger.info("context_dir: {}".format(context_dir))
     logger.info("roi_boxes_dir: {}".format(roi_boxes_dir))
@@ -239,6 +240,7 @@ def main(args):
     logger.info("エポック数: {}".format(num_epochs))
     logger.info("学習率: {}".format(lr))
     logger.info("create_negative_prob: {}".format(create_negative_prob))
+    logger.info("num_examples: {}".format(num_examples))
 
     logger.info("結果は{}に保存されます。".format(result_save_dir))
     os.makedirs(result_save_dir,exist_ok=True)
@@ -275,7 +277,14 @@ def main(args):
 
     #データセットとデータローダの作成
     logger.info("データセットを作成します。")
-    dataset=create_dataset(context_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir,is_stair_captions)
+    dataset=create_dataset(
+        context_dir,
+        roi_boxes_dir,
+        roi_features_dir,
+        roi_labels_dir,
+        is_stair_captions,
+        num_examples=num_examples
+    )
 
     #Optimizerの作成
     optimizer=AdamW(im_bert.parameters(),lr=lr,eps=1e-8)
@@ -322,6 +331,7 @@ if __name__=="__main__":
     parser.add_argument("--use_multi_gpus",action="store_true")
     parser.add_argument("--no_init_params_from_pretrained_bert",action="store_true")
     parser.add_argument("--is_stair_captions",action="store_true")
+    parser.add_argument("--num_examples",type=int,default=-1)
     args=parser.parse_args()
 
     main(args)
