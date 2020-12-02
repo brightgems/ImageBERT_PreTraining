@@ -259,11 +259,6 @@ def main(args):
         im_bert.setup_image_bert(pretrained_model_name)
     im_bert.to(device)
 
-    if use_multi_gpus:
-        logger.info("複数のGPUを使用して学習を行います。")
-        im_bert=nn.DataParallel(im_bert)
-        torch.backends.cudnn.benchmark=True
-
     #学習を再開する場合
     if resume_epoch is not None:
         checkpoint_filepath=os.path.join(result_save_dir,"checkpoint_{}.pt".format(resume_epoch-1))
@@ -274,6 +269,11 @@ def main(args):
 
         parameters=torch.load(checkpoint_filepath,map_location=device)
         im_bert.load_state_dict(parameters)
+
+    if use_multi_gpus:
+        logger.info("複数のGPUを使用して学習を行います。")
+        im_bert=nn.DataParallel(im_bert)
+        torch.backends.cudnn.benchmark=True
 
     #データセットとデータローダの作成
     logger.info("データセットを作成します。")
