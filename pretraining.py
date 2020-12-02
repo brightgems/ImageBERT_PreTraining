@@ -285,6 +285,7 @@ def main(args):
         is_stair_captions,
         num_examples=num_examples
     )
+    logger.info("データ数: {}".format(len(dataset)))
 
     #Optimizerの作成
     optimizer=AdamW(im_bert.parameters(),lr=lr,eps=1e-8)
