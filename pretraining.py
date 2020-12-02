@@ -312,7 +312,10 @@ def main(args):
 
         #チェックポイントの保存
         checkpoint_filepath=os.path.join(result_save_dir,"checkpoint_{}.pt".format(epoch))
-        torch.save(im_bert.state_dict(),checkpoint_filepath)
+        if use_multi_gpus:
+            torch.save(im_bert.module.state_dict(),checkpoint_filepath)
+        else:
+            torch.save(im_bert.state_dict(),checkpoint_filepath)
 
 if __name__=="__main__":
     parser=argparse.ArgumentParser()
