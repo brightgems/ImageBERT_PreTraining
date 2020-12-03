@@ -215,6 +215,7 @@ def main(args):
     create_negative_prob:float=args.create_negative_prob
     result_save_dir:str=args.result_save_dir
     resume_epoch:int=args.resume_epoch
+    imbert_checkpoint_filepath:str=args.imbert_checkpoint_filepath
     use_multi_gpus:bool=args.use_multi_gpus
     no_init_params_from_pretrained_bert:bool=args.no_init_params_from_pretrained_bert
     is_stair_captions:bool=args.is_stair_captions
@@ -248,6 +249,12 @@ def main(args):
         im_bert=ImageBertForPreTraining(config)
         im_bert.setup_image_bert(pretrained_model_name)
     im_bert.to(device)
+
+    if imbert_checkpoint_filepath is not None:
+        logger.info("{}からチェックポイントを読み込みます。".format(imbert_checkpoint_filepath))
+
+        parameters=torch.load(imbert_checkpoint_filepath,map_location=device)
+        im_bert.load_state_dict(parameters)
 
     #学習を再開する場合
     if resume_epoch is not None:
@@ -322,6 +329,7 @@ if __name__=="__main__":
     parser.add_argument("--create_negative_prob",type=float)
     parser.add_argument("--result_save_dir",type=str)
     parser.add_argument("--resume_epoch",type=int)
+    parser.add_argument("--imbert_checkpoint_filepath",type=str)
     parser.add_argument("--use_multi_gpus",action="store_true")
     parser.add_argument("--no_init_params_from_pretrained_bert",action="store_true")
     parser.add_argument("--is_stair_captions",action="store_true")
