@@ -172,6 +172,32 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         }
         return ret
 
+    def __create_attention_mask(
+        self,
+        input_ids:torch.Tensor,
+        roi_boxes:torch.Tensor)->torch.Tensor:
+        device=self.fc_mrfr.weight.device
+
+        batch_size=roi_boxes.size(0)
+        max_num_rois=roi_boxes.size(1)
+
+        roi_attention_mask=torch.empty(batch_size,max_num_rois,dtype=torch.long).to(device)
+        for i in range(batch_size):
+            for j in range(max_num_rois):
+                roi_box=roi_boxes[i,j]  #(4)
+
+                #0ベクトルならそのRoIは存在しないので、attention_mask=0
+                if torch.all(roi_box<1.0e-8):
+                    roi_attention_mask[i,j]=0
+                else:
+                    roi_attention_mask[i,j]=1
+        
+        text_attention_mask=(input_ids!=0).long().to(device)
+        text_attention_mask=text_attention_mask[:,:BERT_MAX_SEQ_LENGTH-max_num_rois]
+        attention_mask=torch.cat([text_attention_mask,roi_attention_mask],dim=1)
+
+        return attention_mask
+
     def forward(
         self,
         input_ids:torch.Tensor, #(N,BERT_MAX_SEQ_LENGTH)
@@ -186,7 +212,7 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         """
         device=self.fc_mrfr.weight.device
 
-        batch_size=roi_features.size(0)
+        batch_size=roi_boxes.size(0)
         max_num_rois=roi_boxes.size(1)
 
         #入力サンプルの作成
@@ -210,17 +236,21 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         masked_input_ids=torch.cat([masked_token_ids,masked_roi_labels],dim=1)
         masked_lm_oc_labels=torch.cat([masked_lm_labels,masked_oc_labels],dim=1)
 
+        #Attention Maskを作成する。
+        attention_mask=self.__create_attention_mask(input_ids,roi_boxes)
+
+        #Attention Maskが0の部分はLoss計算時に無視する。
+        masked_lm_oc_labels[attention_mask==0]=-100
+
+        #Forward
         outputs=self.imbert(
             input_ids=masked_input_ids,
+            attention_mask=attention_mask,
             roi_boxes=roi_boxes,
             roi_features=roi_features,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict
         )
-
-        #Attention Maskが0の部分はLoss計算時に無視する。
-        attention_mask=self.imbert.get_attention_mask() #(N,BERT_MAX_SEQ_LENGTH)
-        masked_lm_oc_labels[attention_mask==0]=-100
 
         #各種Lossの計算
         criterion_ce=nn.CrossEntropyLoss()
