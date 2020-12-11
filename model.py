@@ -206,7 +206,8 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         roi_labels:torch.Tensor,    #(N,max_num_rois)
         create_negative_prob:float=0.2,
         output_hidden_states:bool=None,
-        return_dict:bool=None):
+        return_dict:bool=None,
+        roi_dummy_position:int=None):
         """
         roi_labelsはFaster R-CNNで検出されたRoIのクラス
         """
@@ -249,7 +250,8 @@ class ImageBertForPreTraining(BertPreTrainedModel):
             roi_boxes=roi_boxes,
             roi_features=roi_features,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict
+            return_dict=return_dict,
+            roi_dummy_position=roi_dummy_position
         )
 
         #各種Lossの計算
