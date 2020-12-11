@@ -2,6 +2,7 @@ import argparse
 import glob
 import logging
 import os
+from imagebert.model import BERT_MAX_SEQ_LENGTH
 import torch
 import torch.nn as nn
 from torch.utils.data import(
@@ -183,7 +184,7 @@ def train(
             "return_dict":True
         }
         if use_roi_dummy_position:
-            inputs["roi_dummy_position"]=0
+            inputs["roi_dummy_position"]=BERT_MAX_SEQ_LENGTH-1
 
         #Initialize gradiants
         im_bert.zero_grad()
