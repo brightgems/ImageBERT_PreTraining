@@ -207,7 +207,7 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         create_negative_prob:float=0.2,
         output_hidden_states:bool=None,
         return_dict:bool=None,
-        roi_dummy_position:int=None):
+        use_roi_seq_position:bool=False):
         """
         roi_labelsはFaster R-CNNで検出されたRoIのクラス
         """
@@ -251,7 +251,7 @@ class ImageBertForPreTraining(BertPreTrainedModel):
             roi_features=roi_features,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
-            roi_dummy_position=roi_dummy_position
+            use_roi_seq_position=use_roi_seq_position
         )
 
         #各種Lossの計算

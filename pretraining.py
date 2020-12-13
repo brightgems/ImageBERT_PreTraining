@@ -2,7 +2,6 @@ import argparse
 import glob
 import logging
 import os
-from imagebert.model import BERT_MAX_SEQ_LENGTH
 import torch
 import torch.nn as nn
 from torch.utils.data import(
@@ -159,7 +158,7 @@ def train(
     max_num_rois:int,
     roi_features_dim:int,
     create_negative_prob:float,
-    use_roi_dummy_position:bool,
+    use_roi_seq_position:bool,
     logging_steps:int=100)->float:
     im_bert.train()
 
@@ -181,10 +180,9 @@ def train(
             "roi_features":roi_info["roi_features"].to(device),
             "roi_labels":roi_info["roi_labels"].to(device),
             "create_negative_prob":create_negative_prob,
-            "return_dict":True
+            "return_dict":True,
+            "use_roi_seq_position":use_roi_seq_position
         }
-        if use_roi_dummy_position:
-            inputs["roi_dummy_position"]=BERT_MAX_SEQ_LENGTH-1
 
         #Initialize gradiants
         im_bert.zero_grad()
@@ -224,7 +222,7 @@ def main(args):
     no_init_params_from_pretrained_bert:bool=args.no_init_params_from_pretrained_bert
     is_stair_captions:bool=args.is_stair_captions
     num_examples:int=args.num_examples
-    use_roi_dummy_position:bool=args.use_roi_dummy_position
+    use_roi_seq_position:bool=args.use_roi_seq_position
 
     logger.info("context_dir: {}".format(context_dir))
     logger.info("roi_boxes_dir: {}".format(roi_boxes_dir))
@@ -238,8 +236,8 @@ def main(args):
     logger.info("create_negative_prob: {}".format(create_negative_prob))
     logger.info("num_examples: {}".format(num_examples))
 
-    if use_roi_dummy_position:
-        logger.info("RoIのSequence Positionにダミーの値を使用します。")
+    if use_roi_seq_position:
+        logger.info("RoIのSequence Positionに昇順の値を使用します。")
 
     logger.info("結果は{}に保存されます。".format(result_save_dir))
     os.makedirs(result_save_dir,exist_ok=True)
@@ -312,7 +310,7 @@ def main(args):
             max_num_rois,
             roi_features_dim,
             create_negative_prob,
-            use_roi_dummy_position,
+            use_roi_seq_position,
             logging_steps=100
         )
         logger.info("訓練時の平均損失: {}".format(mean_loss))
@@ -343,7 +341,7 @@ if __name__=="__main__":
     parser.add_argument("--no_init_params_from_pretrained_bert",action="store_true")
     parser.add_argument("--is_stair_captions",action="store_true")
     parser.add_argument("--num_examples",type=int,default=-1)
-    parser.add_argument("--use_roi_dummy_position",action="store_true")
+    parser.add_argument("--use_roi_seq_position",action="store_true")
     args=parser.parse_args()
 
     main(args)
