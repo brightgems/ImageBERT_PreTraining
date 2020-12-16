@@ -236,6 +236,15 @@ def main(args):
     logger.info("create_negative_prob: {}".format(create_negative_prob))
     logger.info("num_examples: {}".format(num_examples))
 
+    if os.path.exists(context_dir)==False:
+        raise RuntimeError("context_dirが存在しません。")
+    if os.path.exists(roi_boxes_dir)==False:
+        raise RuntimeError("roi_boxes_dirが存在しません。")
+    if os.path.exists(roi_features_dir)==False:
+        raise RuntimeError("roi_features_dirが存在しません。")
+    if os.path.exists(roi_labels_dir)==False:
+        raise RuntimeError("roi_labels_dirが存在しません。")
+
     if use_roi_seq_position:
         logger.info("RoIのSequence Positionに昇順の値を使用します。")
 
