@@ -79,7 +79,7 @@ class PretrainingDataset(Dataset):
         self.roi_filenames.append(roi_filename)
 
 def create_dataset(
-    list_filepath:str,
+    sample_list_filepath:str,
     input_ids_dir:str,
     roi_boxes_dir:str,
     roi_features_dir:str,
@@ -90,10 +90,7 @@ def create_dataset(
     """
     dataset=PretrainingDataset(input_ids_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir)
 
-    with open(list_filepath,"r",encoding="utf_8") as r:
-        lines=r.read().splitlines()
-
-    with open(list_filepath,"r",encoding="utf_8") as r:
+    with open(sample_list_filepath,"r",encoding="utf_8") as r:
         lines=r.read().splitlines()
 
     lines=lines[:num_examples]
@@ -231,6 +228,7 @@ def train(
     return ret
 
 def main(args):
+    sample_list_filepath:str=args.sample_list_filepath
     input_ids_dir:str=args.input_ids_dir
     roi_boxes_dir:str=args.roi_boxes_dir
     roi_features_dir:str=args.roi_features_dir
@@ -247,6 +245,7 @@ def main(args):
     no_init_params_from_pretrained_bert:bool=args.no_init_params_from_pretrained_bert
     num_examples:int=args.num_examples
 
+    logger.info("sample_list_filepath: {}".format(sample_list_filepath))
     logger.info("input_ids_dir: {}".format(input_ids_dir))
     logger.info("roi_boxes_dir: {}".format(roi_boxes_dir))
     logger.info("roi_features_dir: {}".format(roi_features_dir))
@@ -309,6 +308,7 @@ def main(args):
     #データセットとデータローダの作成
     logger.info("データセットを作成します。")
     dataset=create_dataset(
+        sample_list_filepath,
         input_ids_dir,
         roi_boxes_dir,
         roi_features_dir,
@@ -357,6 +357,7 @@ def main(args):
 
 if __name__=="__main__":
     parser=argparse.ArgumentParser()
+    parser.add_argument("--sample_list_filepath",type=str)
     parser.add_argument("--input_ids_dir",type=str)
     parser.add_argument("--roi_boxes_dir",type=str)
     parser.add_argument("--roi_features_dir",type=str)
