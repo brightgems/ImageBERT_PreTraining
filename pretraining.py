@@ -41,10 +41,7 @@ class PretrainingDataset(Dataset):
         roi_features_dir:str,
         roi_labels_dir:str):
         self.input_ids_filenames:List[str]=[]
-        self.roi_boxes_filenames:List[str]=[]
-        self.roi_features_filenames:List[str]=[]
-        self.roi_labels_filenames:List[str]=[]
-
+        self.roi_filenames:List[str]=[]
         self.input_ids_dir=input_ids_dir
         self.roi_boxes_dir=roi_boxes_dir
         self.roi_features_dir=roi_features_dir
@@ -58,16 +55,14 @@ class PretrainingDataset(Dataset):
         読み込むべきファイルへのファイルパスを返す。
         """
         input_ids_filename=self.input_ids_filenames[index]
-        roi_boxes_filename=self.roi_boxes_filenames[index]
-        roi_features_filename=self.roi_features_filenames[index]
-        roi_labels_filename=self.roi_labels_filenames[index]
+        roi_filename=self.roi_filenames[index]
 
-        is_positive_sample=True if input_ids_filename==roi_boxes_filename else False
+        is_positive_sample=True if input_ids_filename==roi_filename else False
 
         input_ids_filepath=os.path.join(self.input_ids_dir,input_ids_filename)
-        roi_boxes_filepath=os.path.join(self.roi_boxes_dir,roi_boxes_filename)
-        roi_features_filepath=os.path.join(self.roi_features_dir,roi_features_filename)
-        roi_labels_filepath=os.path.join(self.roi_labels_dir,roi_labels_filename)
+        roi_boxes_filepath=os.path.join(self.roi_boxes_dir,roi_filename)
+        roi_features_filepath=os.path.join(self.roi_features_dir,roi_filename)
+        roi_labels_filepath=os.path.join(self.roi_labels_dir,roi_filename)
 
         ret={
             "input_ids_filepath":input_ids_filepath,
@@ -81,13 +76,9 @@ class PretrainingDataset(Dataset):
     def append(
         self,
         input_ids_filename:str,
-        roi_boxes_filename:str,
-        roi_features_filename:str,
-        roi_labels_filename:str):
+        roi_filename:str):
         self.input_ids_filenames.append(input_ids_filename)
-        self.roi_boxes_filenames.append(roi_boxes_filename)
-        self.roi_features_filenames.append(roi_features_filename)
-        self.roi_labels_filenames.append(roi_labels_filename)
+        self.roi_filenames.append(roi_filename)
 
 def create_dataset(
     list_filepath:str,
@@ -111,10 +102,8 @@ def create_dataset(
         data=json.loads(line)
 
         input_ids_filename=data["input_ids_filename"]
-        roi_boxes_filename=data["roi_boxes_filename"]
-        roi_features_filename=data["roi_features_filename"]
-        roi_labels_filename=data["roi_labels_filename"]
-        dataset.append(input_ids_filename,roi_boxes_filename,roi_features_filename,roi_labels_filename)
+        roi_filename=data["roi_filename"]
+        dataset.append(input_ids_filename,roi_filename)
 
     return dataset
 
