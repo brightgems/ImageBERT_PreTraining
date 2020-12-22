@@ -84,7 +84,7 @@ def create_dataset(
     roi_boxes_dir:str,
     roi_features_dir:str,
     roi_labels_dir:str,
-    num_examples:int=-1)->PretrainingDataset:
+    num_samples:int=-1)->PretrainingDataset:
     """
     データセットを作成する。
     """
@@ -93,7 +93,7 @@ def create_dataset(
     with open(sample_list_filepath,"r",encoding="utf_8") as r:
         lines=r.read().splitlines()
 
-    lines=lines[:num_examples]
+    lines=lines[:num_samples]
     for line in lines:
         input_ids_filename,roi_filename=line.split("\t")
         dataset.append(input_ids_filename,roi_filename)
@@ -247,7 +247,7 @@ def main(args):
     imbert_checkpoint_filepath:str=args.imbert_checkpoint_filepath
     use_multi_gpus:bool=args.use_multi_gpus
     no_init_params_from_pretrained_bert:bool=args.no_init_params_from_pretrained_bert
-    num_examples:int=args.num_examples
+    num_samples:int=args.num_samples
 
     logger.info("sample_list_filepath: {}".format(sample_list_filepath))
     logger.info("input_ids_dir: {}".format(input_ids_dir))
@@ -259,7 +259,7 @@ def main(args):
     logger.info("バッチサイズ: {}".format(batch_size))
     logger.info("エポック数: {}".format(num_epochs))
     logger.info("学習率: {}".format(lr))
-    logger.info("num_examples: {}".format(num_examples))
+    logger.info("num_samples: {}".format(num_samples))
 
     if os.path.exists(input_ids_dir)==False:
         raise RuntimeError("input_ids_dirが存在しません。")
@@ -317,7 +317,7 @@ def main(args):
         roi_boxes_dir,
         roi_features_dir,
         roi_labels_dir,
-        num_examples=num_examples
+        num_samples=num_samples
     )
     logger.info("データ数: {}".format(len(dataset)))
 
@@ -376,7 +376,7 @@ if __name__=="__main__":
     parser.add_argument("--imbert_checkpoint_filepath",type=str)
     parser.add_argument("--use_multi_gpus",action="store_true")
     parser.add_argument("--no_init_params_from_pretrained_bert",action="store_true")
-    parser.add_argument("--num_examples",type=int,default=-1)
+    parser.add_argument("--num_samples",type=int,default=-1)
     args=parser.parse_args()
 
     main(args)
