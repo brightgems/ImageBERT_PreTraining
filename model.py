@@ -139,8 +139,7 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         roi_features:torch.Tensor,  #(N,max_num_rois,roi_features_dim)
         roi_labels:torch.Tensor,    #(N,max_num_rois)
         itm_labels:torch.Tensor,    #(N)    0:負例 1:正例
-        output_hidden_states:bool=None,
-        use_roi_seq_position:bool=False):
+        output_hidden_states:bool=None):
         device=self.fc_mlm.weight.device
 
         batch_size=roi_boxes.size(0)
@@ -174,14 +173,14 @@ class ImageBertForPreTraining(BertPreTrainedModel):
             roi_features=roi_features,
             output_hidden_states=output_hidden_states,
             return_dict=False,
-            use_roi_seq_position=use_roi_seq_position
+            use_roi_seq_position=False
         )
         sequence_output,pooled_output=outputs[:2]
 
         #各種Lossの計算
         criterion_ce=nn.CrossEntropyLoss()
         criterion_mse=nn.MSELoss()
-        criterion_bce=nn.BCELoss()
+        criterion_bce=nn.BCEWithLogitsLoss()
 
         mlm_loss=0
         moc_loss=0
@@ -215,9 +214,19 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         #Image-Text Matching (ITM)
         vec=self.fc_itm(pooled_output)
         target=torch.unsqueeze(itm_labels,1)
-        itm_loss+=criterion_bce(vec,target)
+        itm_loss+=criterion_bce(vec,target.float())
 
         total_loss=mlm_loss+moc_loss+mrfr_loss+itm_loss
 
-        output=(sequence_output,pooled_output)+outputs[2:]
-        return total_loss,output
+        ret={
+            "sequence_output":sequence_output,
+            "pooled_output":pooled_output,
+            "mlm_loss":mlm_loss,
+            "moc_loss":moc_loss,
+            "mrfr_loss":mrfr_loss,
+            "itm_loss":itm_loss,
+            "total_loss":total_loss,
+            "remaining_outputs":outputs[2:]
+        }
+
+        return ret
