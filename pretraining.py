@@ -1,7 +1,9 @@
 import argparse
 import glob
+import json
 import logging
 import os
+from imagebert.model import BERT_MAX_SEQ_LENGTH
 import torch
 import torch.nn as nn
 from torch.utils.data import(
@@ -9,7 +11,11 @@ from torch.utils.data import(
     DataLoader
 )
 from tqdm import tqdm
-from transformers import AdamW,BertConfig,BertJapaneseTokenizer
+from transformers import (
+    AdamW,
+    BertConfig,
+    BertJapaneseTokenizer
+)
 from typing import List
 
 import imagebert.utils as imbutils
@@ -23,91 +29,108 @@ logging.basicConfig(format=logging_fmt)
 logger=logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
 
-device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-class ImageBertDataset(Dataset):
+class PretrainingDataset(Dataset):
     """
     ImageBERTモデルの訓練に必要なデータをまとめたデータセット
-
-    コンテキストのTensorはこのデータセットに保存しておくが、
-    RoIの特徴量はサイズが大きすぎるので、実行時にファイルパスを参照して随時読み込む。
+    実際のデータではなく、データのファイル名を保存しておく。
     """
-    def __init__(self,roi_boxes_dir:str,roi_features_dir:str,roi_labels_dir:str,is_stair_captions:bool):
-        self.input_ids_list:List[torch.Tensor]=[]
-        self.roi_boxes_filepaths:List[str]=[]
-        self.roi_features_filepaths:List[str]=[]
-        self.roi_labels_filepaths:List[str]=[]
+    def __init__(
+        self,
+        input_ids_dir:str,
+        roi_boxes_dir:str,
+        roi_features_dir:str,
+        roi_labels_dir:str):
+        self.input_ids_filenames:List[str]=[]
+        self.roi_boxes_filenames:List[str]=[]
+        self.roi_features_filenames:List[str]=[]
+        self.roi_labels_filenames:List[str]=[]
 
+        self.input_ids_dir=input_ids_dir
         self.roi_boxes_dir=roi_boxes_dir
         self.roi_features_dir=roi_features_dir
         self.roi_labels_dir=roi_labels_dir
-        self.is_stair_captions=is_stair_captions
 
     def __len__(self):
-        return len(self.input_ids_list)
+        return len(self.input_ids_filenames)
 
     def __getitem__(self,index:int):
         """
-        指定されたインデックスのデータをDict形式で返す。
+        読み込むべきファイルへのファイルパスを返す。
         """
-        input_ids=self.input_ids_list[index]
-        roi_boxes_filepath=self.roi_boxes_filepaths[index]
-        roi_features_filepath=self.roi_features_filepaths[index]
-        roi_labels_filepath=self.roi_labels_filepaths[index]
+        input_ids_filename=self.input_ids_filenames[index]
+        roi_boxes_filename=self.roi_boxes_filenames[index]
+        roi_features_filename=self.roi_features_filenames[index]
+        roi_labels_filename=self.roi_labels_filenames[index]
+
+        is_positive_sample=True if input_ids_filename==roi_boxes_filename else False
+
+        input_ids_filepath=os.path.join(self.input_ids_dir,input_ids_filename)
+        roi_boxes_filepath=os.path.join(self.roi_boxes_dir,roi_boxes_filename)
+        roi_features_filepath=os.path.join(self.roi_features_dir,roi_features_filename)
+        roi_labels_filepath=os.path.join(self.roi_labels_dir,roi_labels_filename)
 
         ret={
-            "input_ids":input_ids,
+            "input_ids_filepath":input_ids_filepath,
             "roi_boxes_filepath":roi_boxes_filepath,
             "roi_features_filepath":roi_features_filepath,
-            "roi_labels_filepath":roi_labels_filepath
+            "roi_labels_filepath":roi_labels_filepath,
+            "is_positive_sample":is_positive_sample
         }
-
         return ret
 
-    def append(self,input_ids_filepath:str):
-        input_ids=torch.load(input_ids_filepath,map_location=torch.device("cpu"))
-
-        basename=os.path.basename(input_ids_filepath)
-        title_hash=os.path.splitext(basename)[0]
-
-        roi_boxes_filepath=os.path.join(self.roi_boxes_dir,title_hash+".pt")
-        roi_features_filepath=os.path.join(self.roi_features_dir,title_hash+".pt")
-        roi_labels_filepath=os.path.join(self.roi_labels_dir,title_hash+".pt")
-
-        if self.is_stair_captions:
-            for i in range(5):
-                self.input_ids_list.append(input_ids[i])
-                self.roi_boxes_filepaths.append(roi_boxes_filepath)
-                self.roi_features_filepaths.append(roi_features_filepath)
-                self.roi_labels_filepaths.append(roi_labels_filepath)
-        else:
-            self.input_ids_list.append(input_ids)
-            self.roi_boxes_filepaths.append(roi_boxes_filepath)
-            self.roi_features_filepaths.append(roi_features_filepath)
-            self.roi_labels_filepaths.append(roi_labels_filepath)
+    def append(
+        self,
+        input_ids_filename:str,
+        roi_boxes_filename:str,
+        roi_features_filename:str,
+        roi_labels_filename:str):
+        self.input_ids_filenames.append(input_ids_filename)
+        self.roi_boxes_filenames.append(roi_boxes_filename)
+        self.roi_features_filenames.append(roi_features_filename)
+        self.roi_labels_filenames.append(roi_labels_filename)
 
 def create_dataset(
-    context_dir:str,
+    list_filepath:str,
+    input_ids_dir:str,
     roi_boxes_dir:str,
     roi_features_dir:str,
     roi_labels_dir:str,
-    is_stair_captions:bool,
-    num_examples:int=-1)->ImageBertDataset:
+    num_examples:int=-1)->PretrainingDataset:
     """
     データセットを作成する。
+    サンプルのリストはJSONファイルから読み込む。
     """
-    pathname=os.path.join(context_dir,"*")
-    context_files=glob.glob(pathname)
-    logger.info("コンテキストの数: {}".format(len(context_files)))
+    dataset=PretrainingDataset(input_ids_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir)
 
-    dataset=ImageBertDataset(roi_boxes_dir,roi_features_dir,roi_labels_dir,is_stair_captions=is_stair_captions)
-    for i,context_file in tqdm(enumerate(context_files),total=len(context_files)):
-        if num_examples>=0 and i>=num_examples:
+    with open(list_filepath,"r",encoding="utf_8") as r:
+        lines=r.read().splitlines()
+    for idx,line in enumerate(lines):
+        if num_examples>=0 and idx>=num_examples:
             break
 
-        dataset.append(context_file)
+        data=json.loads(line)
+
+        input_ids_filename=data["input_ids_filename"]
+        roi_boxes_filename=data["roi_boxes_filename"]
+        roi_features_filename=data["roi_features_filename"]
+        roi_labels_filename=data["roi_labels_filename"]
+        dataset.append(input_ids_filename,roi_boxes_filename,roi_features_filename,roi_labels_filename)
 
     return dataset
+
+def load_input_ids_from_files(
+    input_ids_filepaths:List[str])->torch.Tensor:
+    """
+    テキスト入力(Input IDs)をファイルから読み込む。
+    """
+    batch_size=len(input_ids_filepaths)
+
+    ret_input_ids=torch.empty(batch_size,BERT_MAX_SEQ_LENGTH,dtype=torch.long)
+    for i in range(batch_size):
+        input_ids=torch.load(input_ids_filepaths[i])
+        ret_input_ids[i]=input_ids
+
+    return ret_input_ids
 
 def load_roi_info_from_files(
     roi_boxes_filepaths:List[str],
@@ -127,18 +150,9 @@ def load_roi_info_from_files(
     ret_roi_labels=torch.empty(batch_size,max_num_rois,dtype=torch.long)
 
     for i in range(batch_size):
-        roi_boxes=None
-        roi_features=None
-        roi_labels=None
-        #RoIの情報が存在する場合はそれを読み込む。
-        if os.path.exists(roi_boxes_filepaths[i]):
-            roi_boxes=imbutils.load_roi_boxes_from_file(roi_boxes_filepaths[i],max_num_rois)
-            roi_features=imbutils.load_roi_features_from_file(roi_features_filepaths[i],max_num_rois)
-            roi_labels=imbutils.load_roi_labels_from_file(roi_labels_filepaths[i],max_num_rois)
-        else:
-            roi_boxes=torch.zeros(max_num_rois,4)
-            roi_features=torch.zeros(max_num_rois,roi_features_dim)
-            roi_labels=torch.zeros(max_num_rois,dtype=torch.long)
+        roi_boxes=imbutils.load_roi_boxes_from_file(roi_boxes_filepaths[i],max_num_rois)
+        roi_features=imbutils.load_roi_features_from_file(roi_features_filepaths[i],max_num_rois)
+        roi_labels=imbutils.load_roi_labels_from_file(roi_labels_filepaths[i],max_num_rois)
         
         ret_roi_boxes[i]=roi_boxes
         ret_roi_features[i]=roi_features
@@ -157,15 +171,23 @@ def train(
     optimizer:torch.optim.Optimizer,
     max_num_rois:int,
     roi_features_dim:int,
-    create_negative_prob:float,
-    use_roi_seq_position:bool,
-    logging_steps:int=100)->float:
+    logging_steps:int=100):
+    """
+    モデルの訓練を1エポック進める。
+    このエポックでの平均損失はDict形式で返される。
+    """
     im_bert.train()
 
     count_steps=0
-    total_loss=0
+    accum_total_loss=0
+    accum_mlm_loss=0
+    accum_moc_loss=0
+    accum_mrfr_loss=0
+    accum_itm_loss=0
 
     for batch_idx,batch in enumerate(dataloader):
+        input_ids=load_input_ids_from_files(batch["input_ids_filepath"])
+
         roi_info=load_roi_info_from_files(
             batch["roi_boxes_filepath"],
             batch["roi_features_filepath"],
@@ -174,38 +196,57 @@ def train(
             roi_features_dim,
         )
 
+        itm_labels=batch["is_positive_sample"]
+        itm_labels=torch.tensor(itm_labels).long()
+
         inputs={
-            "input_ids":batch["input_ids"].to(device),
-            "roi_boxes":roi_info["roi_boxes"].to(device),
-            "roi_features":roi_info["roi_features"].to(device),
-            "roi_labels":roi_info["roi_labels"].to(device),
-            "create_negative_prob":create_negative_prob,
-            "return_dict":True,
-            "use_roi_seq_position":use_roi_seq_position
+            "input_ids":input_ids,
+            "roi_boxes":roi_info["roi_boxes"],
+            "roi_features":roi_info["roi_features"],
+            "roi_labels":roi_info["roi_labels"],
+            "itm_labels":itm_labels
         }
 
         #Initialize gradiants
         im_bert.zero_grad()
         #Forward propagation
         outputs=im_bert(**inputs)
-        loss=outputs["loss"]
+        total_loss=outputs["total_loss"]
         #Backward propagation
-        loss=loss.mean()
-        loss.backward()
-        nn.utils.clip_grad_norm_(im_bert.parameters(), 1.0)
+        total_loss=total_loss.mean()
+        total_loss.backward()
         # Update parameters
         optimizer.step()
 
         count_steps+=1
-        total_loss+=loss.item()
+        accum_total_loss+=total_loss.item()
+
+        #各タスクのロスも記録しておく。
+        mlm_loss=outputs["mlm_loss"]
+        moc_loss=outputs["moc_loss"]
+        mrfr_loss=outputs["mrfr_loss"]
+        itm_loss=outputs["itm_loss"]
+        accum_mlm_loss+=mlm_loss.mean().item()
+        accum_moc_loss+=moc_loss.mean().item()
+        accum_mrfr_loss+=mrfr_loss.mean().item()
+        accum_itm_loss+=itm_loss.mean().item()
 
         if batch_idx%logging_steps==0:
-            logger.info("Step: {}\tLoss: {}".format(batch_idx,loss.item()))
+            logger.info("Step: {}\tTotal Loss: {}\tMLM Loss: {}\tMOC Loss: {}\tMRFR Loss: {}\tITM Loss: {}".format(
+                batch_idx,total_loss.item(),mlm_loss.item(),moc_loss.item(),mrfr_loss.item(),itm_loss.item())
+            )
 
-    return total_loss/count_steps
+    ret={
+        "total_loss":accum_total_loss/count_steps,
+        "mlm_loss":accum_mlm_loss/count_steps,
+        "moc_loss":accum_moc_loss/count_steps,
+        "mrfr_loss":accum_mrfr_loss/count_steps,
+        "itm_loss":accum_itm_loss/count_steps
+    }
+    return ret
 
 def main(args):
-    context_dir:str=args.context_dir
+    input_ids_dir:str=args.input_ids_dir
     roi_boxes_dir:str=args.roi_boxes_dir
     roi_features_dir:str=args.roi_features_dir
     roi_labels_dir:str=args.roi_labels_dir
@@ -214,17 +255,14 @@ def main(args):
     batch_size:int=args.batch_size
     num_epochs:int=args.num_epochs
     lr:float=args.lr
-    create_negative_prob:float=args.create_negative_prob
     result_save_dir:str=args.result_save_dir
     resume_epoch:int=args.resume_epoch
     imbert_checkpoint_filepath:str=args.imbert_checkpoint_filepath
     use_multi_gpus:bool=args.use_multi_gpus
     no_init_params_from_pretrained_bert:bool=args.no_init_params_from_pretrained_bert
-    is_stair_captions:bool=args.is_stair_captions
     num_examples:int=args.num_examples
-    use_roi_seq_position:bool=args.use_roi_seq_position
 
-    logger.info("context_dir: {}".format(context_dir))
+    logger.info("input_ids_dir: {}".format(input_ids_dir))
     logger.info("roi_boxes_dir: {}".format(roi_boxes_dir))
     logger.info("roi_features_dir: {}".format(roi_features_dir))
     logger.info("roi_labels_dir: {}".format(roi_labels_dir))
@@ -233,20 +271,16 @@ def main(args):
     logger.info("バッチサイズ: {}".format(batch_size))
     logger.info("エポック数: {}".format(num_epochs))
     logger.info("学習率: {}".format(lr))
-    logger.info("create_negative_prob: {}".format(create_negative_prob))
     logger.info("num_examples: {}".format(num_examples))
 
-    if os.path.exists(context_dir)==False:
-        raise RuntimeError("context_dirが存在しません。")
+    if os.path.exists(input_ids_dir)==False:
+        raise RuntimeError("input_ids_dirが存在しません。")
     if os.path.exists(roi_boxes_dir)==False:
         raise RuntimeError("roi_boxes_dirが存在しません。")
     if os.path.exists(roi_features_dir)==False:
         raise RuntimeError("roi_features_dirが存在しません。")
     if os.path.exists(roi_labels_dir)==False:
         raise RuntimeError("roi_labels_dirが存在しません。")
-
-    if use_roi_seq_position:
-        logger.info("RoIのSequence Positionに昇順の値を使用します。")
 
     logger.info("結果は{}に保存されます。".format(result_save_dir))
     os.makedirs(result_save_dir,exist_ok=True)
@@ -263,12 +297,10 @@ def main(args):
         logger.info("{}から事前学習済みの重みを読み込みます。".format(pretrained_model_name))
         im_bert=ImageBertForPreTraining(config)
         im_bert.setup_image_bert(pretrained_model_name)
-    im_bert.to(device)
 
     if imbert_checkpoint_filepath is not None:
         logger.info("{}からチェックポイントを読み込みます。".format(imbert_checkpoint_filepath))
-
-        parameters=torch.load(imbert_checkpoint_filepath,map_location=device)
+        parameters=torch.load(imbert_checkpoint_filepath,map_location=torch.device("cpu"))
         im_bert.load_state_dict(parameters)
 
     #学習を再開する場合
@@ -278,9 +310,11 @@ def main(args):
             raise RuntimeError("チェックポイントが存在しません。")
 
         logger.info("{}からチェックポイントを読み込みます。".format(checkpoint_filepath))
-
-        parameters=torch.load(checkpoint_filepath,map_location=device)
+        parameters=torch.load(checkpoint_filepath,map_location=torch.device("cpu"))
         im_bert.load_state_dict(parameters)
+
+    device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    im_bert.to(device)
 
     if use_multi_gpus:
         logger.info("複数のGPUを使用して学習を行います。")
@@ -290,11 +324,10 @@ def main(args):
     #データセットとデータローダの作成
     logger.info("データセットを作成します。")
     dataset=create_dataset(
-        context_dir,
+        input_ids_dir,
         roi_boxes_dir,
         roi_features_dir,
         roi_labels_dir,
-        is_stair_captions,
         num_examples=num_examples
     )
     logger.info("データ数: {}".format(len(dataset)))
@@ -312,17 +345,23 @@ def main(args):
         dataloader=DataLoader(dataset,batch_size=batch_size,shuffle=True)
 
         #訓練
-        mean_loss=train(
+        train_res=train(
             im_bert,
             dataloader,
             optimizer,
             max_num_rois,
             roi_features_dim,
-            create_negative_prob,
-            use_roi_seq_position,
             logging_steps=100
         )
-        logger.info("訓練時の平均損失: {}".format(mean_loss))
+        mean_total_loss=train_res["total_loss"]
+        mean_mlm_loss=train_res["mlm_loss"]
+        mean_moc_loss=train_res["moc_loss"]
+        mean_mrfr_loss=train_res["mrfr_loss"]
+        mean_itm_loss=train_res["itm_loss"]
+
+        logger.info("Total Loss: {}\tMLM Loss: {}\tMOC Loss: {}\t MRFR Loss: {}\tITM Loss: {}".format(
+            mean_total_loss,mean_mlm_loss,mean_moc_loss,mean_mrfr_loss,mean_itm_loss)
+        )
 
         #チェックポイントの保存
         checkpoint_filepath=os.path.join(result_save_dir,"checkpoint_{}.pt".format(epoch))
@@ -333,7 +372,7 @@ def main(args):
 
 if __name__=="__main__":
     parser=argparse.ArgumentParser()
-    parser.add_argument("--context_dir",type=str)
+    parser.add_argument("--input_ids_dir",type=str)
     parser.add_argument("--roi_boxes_dir",type=str)
     parser.add_argument("--roi_features_dir",type=str)
     parser.add_argument("--roi_labels_dir",type=str)
@@ -342,15 +381,12 @@ if __name__=="__main__":
     parser.add_argument("--batch_size",type=int)
     parser.add_argument("--num_epochs",type=int)
     parser.add_argument("--lr",type=float)
-    parser.add_argument("--create_negative_prob",type=float)
     parser.add_argument("--result_save_dir",type=str)
     parser.add_argument("--resume_epoch",type=int)
     parser.add_argument("--imbert_checkpoint_filepath",type=str)
     parser.add_argument("--use_multi_gpus",action="store_true")
     parser.add_argument("--no_init_params_from_pretrained_bert",action="store_true")
-    parser.add_argument("--is_stair_captions",action="store_true")
     parser.add_argument("--num_examples",type=int,default=-1)
-    parser.add_argument("--use_roi_seq_position",action="store_true")
     args=parser.parse_args()
 
     main(args)
