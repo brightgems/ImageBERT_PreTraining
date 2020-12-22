@@ -1,6 +1,4 @@
 import argparse
-import glob
-import json
 import logging
 import os
 from imagebert.model import BERT_MAX_SEQ_LENGTH
@@ -89,20 +87,18 @@ def create_dataset(
     num_examples:int=-1)->PretrainingDataset:
     """
     データセットを作成する。
-    サンプルのリストはJSONファイルから読み込む。
     """
     dataset=PretrainingDataset(input_ids_dir,roi_boxes_dir,roi_features_dir,roi_labels_dir)
 
     with open(list_filepath,"r",encoding="utf_8") as r:
         lines=r.read().splitlines()
-    for idx,line in enumerate(lines):
-        if num_examples>=0 and idx>=num_examples:
-            break
 
-        data=json.loads(line)
+    with open(list_filepath,"r",encoding="utf_8") as r:
+        lines=r.read().splitlines()
 
-        input_ids_filename=data["input_ids_filename"]
-        roi_filename=data["roi_filename"]
+    lines=lines[:num_examples]
+    for line in lines:
+        input_ids_filename,roi_filename=line.split("\t")
         dataset.append(input_ids_filename,roi_filename)
 
     return dataset
