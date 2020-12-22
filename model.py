@@ -18,7 +18,7 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         self,
         config:BertConfig,
         roi_features_dim:int=1024,
-        num_classes:int=80):
+        num_classes:int=91):
         super().__init__(config)
 
         self.imbert=ImageBertModel(config)
@@ -197,7 +197,9 @@ class ImageBertForPreTraining(BertPreTrainedModel):
                     vec=sequence_output[i,j]
                     vec=torch.unsqueeze(vec,0)
                     vec=self.fc_mlm(vec)
-                    mlm_loss+=criterion_ce(vec,input_ids[i,j])
+                    target=torch.unsqueeze(input_ids[i,j],0).to(device)
+
+                    mlm_loss+=criterion_ce(vec,target)
 
             #Masked Object Classification (MOC)
             #Masked Region Feature Regression (MRFR)
@@ -205,15 +207,18 @@ class ImageBertForPreTraining(BertPreTrainedModel):
                 if mask_flags[i,j]:
                     vec_orig=sequence_output[i,j]
                     vec_orig=torch.unsqueeze(vec_orig,0)
+
                     vec_moc=self.fc_moc(vec_orig)
-                    moc_loss+=criterion_ce(vec_moc,roi_labels[i,j-(BERT_MAX_SEQ_LENGTH-max_num_rois)])
+                    target_moc=torch.unsqueeze(roi_labels[i,j-(BERT_MAX_SEQ_LENGTH-max_num_rois)],0).to(device)
+                    moc_loss+=criterion_ce(vec_moc,target_moc)
 
                     vec_mrfr=self.fc_mrfr(vec_orig)
-                    mrfr_loss+=criterion_mse(vec_mrfr,roi_features[i,j-(BERT_MAX_SEQ_LENGTH-max_num_rois)])
+                    target_mrfr=torch.unsqueeze(roi_features[i,j-(BERT_MAX_SEQ_LENGTH-max_num_rois)],0).to(device)
+                    mrfr_loss+=criterion_mse(vec_mrfr,target_mrfr)
 
         #Image-Text Matching (ITM)
         vec=self.fc_itm(pooled_output)
-        target=torch.unsqueeze(itm_labels,1)
+        target=torch.unsqueeze(itm_labels,1).to(device)
         itm_loss+=criterion_bce(vec,target.float())
 
         total_loss=mlm_loss+moc_loss+mrfr_loss+itm_loss

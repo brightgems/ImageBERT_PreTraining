@@ -208,13 +208,17 @@ def train(
         moc_loss=outputs["moc_loss"]
         mrfr_loss=outputs["mrfr_loss"]
         itm_loss=outputs["itm_loss"]
-        accum_mlm_loss+=mlm_loss.mean().item()
-        accum_moc_loss+=moc_loss.mean().item()
-        accum_mrfr_loss+=mrfr_loss.mean().item()
-        accum_itm_loss+=itm_loss.mean().item()
+        mlm_loss=mlm_loss.mean()
+        moc_loss=moc_loss.mean()
+        mrfr_loss=mrfr_loss.mean()
+        itm_loss=itm_loss.mean()
+        accum_mlm_loss+=mlm_loss.item()
+        accum_moc_loss+=moc_loss.item()
+        accum_mrfr_loss+=mrfr_loss.item()
+        accum_itm_loss+=itm_loss.item()
 
         if batch_idx%logging_steps==0:
-            logger.info("Step: {}\tTotal Loss: {}\tMLM Loss: {}\tMOC Loss: {}\tMRFR Loss: {}\tITM Loss: {}".format(
+            logger.info("Step: {}\tTotal: {}\tMLM: {}\tMOC: {}\tMRFR: {}\tITM: {}".format(
                 batch_idx,total_loss.item(),mlm_loss.item(),moc_loss.item(),mrfr_loss.item(),itm_loss.item())
             )
 
