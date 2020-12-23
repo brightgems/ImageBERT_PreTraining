@@ -375,7 +375,7 @@ def main(args):
         mean_mrfr_loss=train_res["mrfr_loss"]
         mean_itm_loss=train_res["itm_loss"]
 
-        logger.info("Total Loss: {}\tMLM Loss: {}\tMOC Loss: {}\t MRFR Loss: {}\tITM Loss: {}".format(
+        logger.info("Total: {}\tMLM: {}\tMOC: {}\t MRFR: {}\tITM: {}".format(
             mean_total_loss,mean_mlm_loss,mean_moc_loss,mean_mrfr_loss,mean_itm_loss)
         )
 
