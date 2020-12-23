@@ -264,6 +264,7 @@ def main(args):
     batch_size:int=args.batch_size
     num_epochs:int=args.num_epochs
     lr:float=args.lr
+    weight_decay:float=args.weight_decay
     result_save_dir:str=args.result_save_dir
     resume_epoch:int=args.resume_epoch
     imbert_checkpoint_filepath:str=args.imbert_checkpoint_filepath
@@ -277,11 +278,12 @@ def main(args):
     logger.info("roi_boxes_dir: {}".format(roi_boxes_dir))
     logger.info("roi_features_dir: {}".format(roi_features_dir))
     logger.info("roi_labels_dir: {}".format(roi_labels_dir))
-    logger.info("RoIの最大数: {}".format(max_num_rois))
-    logger.info("RoI特徴量の次元: {}".format(roi_features_dim))
-    logger.info("バッチサイズ: {}".format(batch_size))
-    logger.info("エポック数: {}".format(num_epochs))
-    logger.info("学習率: {}".format(lr))
+    logger.info("max_num_rois: {}".format(max_num_rois))
+    logger.info("roi_features_dim: {}".format(roi_features_dim))
+    logger.info("batch_size: {}".format(batch_size))
+    logger.info("num_epochs: {}".format(num_epochs))
+    logger.info("lr: {}".format(lr))
+    logger.info("weight_decay: {}".format(weight_decay))
     logger.info("num_samples: {}".format(num_samples))
 
     if os.path.exists(input_ids_dir)==False:
@@ -345,7 +347,7 @@ def main(args):
     logger.info("データ数: {}".format(len(dataset)))
 
     #Optimizerの作成
-    optimizer=AdamW(im_bert.parameters(),lr=lr,eps=1e-8)
+    optimizer=AdamW(im_bert.parameters(),lr=lr,weight_decay=weight_decay)
     
     #訓練ループ
     logger.info("モデルの訓練を開始します。")
@@ -395,6 +397,7 @@ if __name__=="__main__":
     parser.add_argument("--batch_size",type=int)
     parser.add_argument("--num_epochs",type=int)
     parser.add_argument("--lr",type=float)
+    parser.add_argument("--weight_decay",type=float)
     parser.add_argument("--result_save_dir",type=str)
     parser.add_argument("--resume_epoch",type=int)
     parser.add_argument("--imbert_checkpoint_filepath",type=str)
