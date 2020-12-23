@@ -39,7 +39,9 @@ class PretrainingDataset(Dataset):
         roi_features_dir:str,
         roi_labels_dir:str):
         self.input_ids_filenames:List[str]=[]
+        self.caption_indices:List[int]=[]   #STAIR Captionsで使用される。
         self.roi_filenames:List[str]=[]
+
         self.input_ids_dir=input_ids_dir
         self.roi_boxes_dir=roi_boxes_dir
         self.roi_features_dir=roi_features_dir
@@ -53,6 +55,7 @@ class PretrainingDataset(Dataset):
         読み込むべきファイルへのファイルパスを返す。
         """
         input_ids_filename=self.input_ids_filenames[index]
+        caption_index=self.caption_indices[index]
         roi_filename=self.roi_filenames[index]
 
         is_positive_sample=True if input_ids_filename==roi_filename else False
@@ -64,6 +67,7 @@ class PretrainingDataset(Dataset):
 
         ret={
             "input_ids_filepath":input_ids_filepath,
+            "caption_index":caption_index,
             "roi_boxes_filepath":roi_boxes_filepath,
             "roi_features_filepath":roi_features_filepath,
             "roi_labels_filepath":roi_labels_filepath,
@@ -74,8 +78,10 @@ class PretrainingDataset(Dataset):
     def append(
         self,
         input_ids_filename:str,
+        caption_index:int,
         roi_filename:str):
         self.input_ids_filenames.append(input_ids_filename)
+        self.caption_indices.append(caption_index)
         self.roi_filenames.append(roi_filename)
 
 def create_dataset(
@@ -84,7 +90,7 @@ def create_dataset(
     roi_boxes_dir:str,
     roi_features_dir:str,
     roi_labels_dir:str,
-    num_samples:int=-1)->PretrainingDataset:
+    num_samples:int)->PretrainingDataset:
     """
     データセットを作成する。
     """
@@ -95,22 +101,35 @@ def create_dataset(
 
     lines=lines[:num_samples]
     for line in lines:
-        input_ids_filename,roi_filename=line.split("\t")
-        dataset.append(input_ids_filename,roi_filename)
+        splits=line.split("\t")
+        if len(splits)==2:
+            input_ids_filename,roi_filename=splits[:2]
+            dataset.append(input_ids_filename,0,roi_filename)
+        elif len(splits)==3:
+            input_ids_filename,caption_index,roi_filename=splits[:3]
+            dataset.append(input_ids_filename,caption_index,roi_filename)
+        else:
+            raise RuntimeError("サンプルリストの形式が不正です。")
 
     return dataset
 
 def load_input_ids_from_files(
-    input_ids_filepaths:List[str])->torch.Tensor:
+    input_ids_filepaths:List[str],
+    caption_indices:List[int]=None)->torch.Tensor:
     """
     テキスト入力(Input IDs)をファイルから読み込む。
+    STAIR Captionsを用いる場合には、二つ目の引数にキャプションのインデックスを渡す。
     """
     batch_size=len(input_ids_filepaths)
 
     ret_input_ids=torch.empty(batch_size,BERT_MAX_SEQ_LENGTH,dtype=torch.long)
     for i in range(batch_size):
         input_ids=torch.load(input_ids_filepaths[i])
-        ret_input_ids[i]=input_ids
+        if caption_indices is None:
+            ret_input_ids[i]=input_ids
+        else:
+            caption_index=caption_indices[i]
+            ret_input_ids[i]=input_ids[caption_index]
 
     return ret_input_ids
 
@@ -124,8 +143,6 @@ def load_roi_info_from_files(
     RoI情報をファイルから読み込む。
     """
     batch_size=len(roi_boxes_filepaths)
-    if len(roi_features_filepaths)!=batch_size or len(roi_labels_filepaths)!=batch_size:
-        raise RuntimeError("リストに含まれる要素数が不正です。")
 
     ret_roi_boxes=torch.empty(batch_size,max_num_rois,4)
     ret_roi_features=torch.empty(batch_size,max_num_rois,roi_features_dim)
@@ -153,6 +170,7 @@ def train(
     optimizer:torch.optim.Optimizer,
     max_num_rois:int,
     roi_features_dim:int,
+    is_stair_captions:bool,
     logging_steps:int=100):
     """
     モデルの訓練を1エポック進める。
@@ -168,7 +186,11 @@ def train(
     accum_itm_loss=0
 
     for batch_idx,batch in enumerate(dataloader):
-        input_ids=load_input_ids_from_files(batch["input_ids_filepath"])
+        input_ids=None
+        if is_stair_captions:
+            input_ids=load_input_ids_from_files(batch["input_ids_filepath"],batch["caption_index"])
+        else:
+            input_ids=load_input_ids_from_files(batch["input_ids_filepath"])
 
         roi_info=load_roi_info_from_files(
             batch["roi_boxes_filepath"],
@@ -248,6 +270,7 @@ def main(args):
     use_multi_gpus:bool=args.use_multi_gpus
     no_init_params_from_pretrained_bert:bool=args.no_init_params_from_pretrained_bert
     num_samples:int=args.num_samples
+    is_stair_captions:bool=args.is_stair_captions
 
     logger.info("sample_list_filepath: {}".format(sample_list_filepath))
     logger.info("input_ids_dir: {}".format(input_ids_dir))
@@ -340,6 +363,7 @@ def main(args):
             optimizer,
             max_num_rois,
             roi_features_dim,
+            is_stair_captions,
             logging_steps=100
         )
         mean_total_loss=train_res["total_loss"]
@@ -377,6 +401,7 @@ if __name__=="__main__":
     parser.add_argument("--use_multi_gpus",action="store_true")
     parser.add_argument("--no_init_params_from_pretrained_bert",action="store_true")
     parser.add_argument("--num_samples",type=int,default=-1)
+    parser.add_argument("--is_stair_captions",action="store_true")
     args=parser.parse_args()
 
     main(args)
