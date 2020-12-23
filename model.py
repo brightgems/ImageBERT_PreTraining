@@ -182,10 +182,10 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         criterion_mse=nn.MSELoss()
         criterion_bce=nn.BCEWithLogitsLoss()
 
-        mlm_loss=0
-        moc_loss=0
-        mrfr_loss=0
-        itm_loss=0
+        mlm_loss=torch.zeros(1).to(device)
+        moc_loss=torch.zeros(1).to(device)
+        mrfr_loss=torch.zeros(1).to(device)
+        itm_loss=torch.zeros(1).to(device)
         for i in range(batch_size):
             #MLM, MOC, MRFRの損失は正例についてのみ計算する。
             if itm_labels[i]==0:
