@@ -193,6 +193,9 @@ class ImageBertForPreTraining(BertPreTrainedModel):
 
             #Masked Language Modeling (MLM)
             for j in range(BERT_MAX_SEQ_LENGTH-max_num_rois):
+                if input_attention_mask[i,j]==0:
+                    continue
+
                 if mask_flags[i,j]:
                     vec=sequence_output[i,j]
                     vec=torch.unsqueeze(vec,0)
@@ -204,6 +207,9 @@ class ImageBertForPreTraining(BertPreTrainedModel):
             #Masked Object Classification (MOC)
             #Masked Region Feature Regression (MRFR)
             for j in range(BERT_MAX_SEQ_LENGTH-max_num_rois,BERT_MAX_SEQ_LENGTH):
+                if input_attention_mask[i,j]==0:
+                    continue
+
                 if mask_flags[i,j]:
                     vec_orig=sequence_output[i,j]
                     vec_orig=torch.unsqueeze(vec_orig,0)
