@@ -107,6 +107,7 @@ def create_dataset(
             dataset.append(input_ids_filename,0,roi_filename)
         elif len(splits)==3:
             input_ids_filename,caption_index,roi_filename=splits[:3]
+            caption_index=int(caption_index)
             dataset.append(input_ids_filename,caption_index,roi_filename)
         else:
             raise RuntimeError("サンプルリストの形式が不正です。")
