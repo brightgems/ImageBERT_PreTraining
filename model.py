@@ -227,8 +227,6 @@ class ImageBertForPreTraining(BertPreTrainedModel):
         target=torch.unsqueeze(itm_labels,1).to(device)
         itm_loss+=criterion_bce(vec,target.float())
 
-        total_loss=mlm_loss+moc_loss+mrfr_loss+itm_loss
-
         ret={
             "sequence_output":sequence_output,
             "pooled_output":pooled_output,
@@ -236,7 +234,6 @@ class ImageBertForPreTraining(BertPreTrainedModel):
             "moc_loss":moc_loss,
             "mrfr_loss":mrfr_loss,
             "itm_loss":itm_loss,
-            "total_loss":total_loss,
             "remaining_outputs":outputs[2:]
         }
 

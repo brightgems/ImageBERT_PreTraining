@@ -172,6 +172,10 @@ def train(
     max_num_rois:int,
     roi_features_dim:int,
     is_stair_captions:bool,
+    mlm_weight:float,
+    moc_weight:float,
+    mrfr_weight:float,
+    itm_weight:float,
     logging_steps:int=100):
     """
     モデルの訓練を1エポック進める。
@@ -216,9 +220,12 @@ def train(
         im_bert.zero_grad()
         #Forward propagation
         outputs=im_bert(**inputs)
-        total_loss=outputs["total_loss"]
         #Backward propagation
-        total_loss=total_loss.mean()
+        mlm_loss=outputs["mlm_loss"].mean()*mlm_weight
+        moc_loss=outputs["moc_loss"].mean()*moc_weight
+        mrfr_loss=outputs["mrfr_loss"].mean()*mrfr_weight
+        itm_loss=outputs["itm_loss"].mean()*itm_weight
+        total_loss=mlm_loss+moc_loss+mrfr_loss+itm_loss
         total_loss.backward()
         # Update parameters
         optimizer.step()
@@ -227,14 +234,6 @@ def train(
         accum_total_loss+=total_loss.item()
 
         #各タスクのロスも記録しておく。
-        mlm_loss=outputs["mlm_loss"]
-        moc_loss=outputs["moc_loss"]
-        mrfr_loss=outputs["mrfr_loss"]
-        itm_loss=outputs["itm_loss"]
-        mlm_loss=mlm_loss.mean()
-        moc_loss=moc_loss.mean()
-        mrfr_loss=mrfr_loss.mean()
-        itm_loss=itm_loss.mean()
         accum_mlm_loss+=mlm_loss.item()
         accum_moc_loss+=moc_loss.item()
         accum_mrfr_loss+=mrfr_loss.item()
@@ -273,6 +272,10 @@ def main(args):
     no_init_params_from_pretrained_bert:bool=args.no_init_params_from_pretrained_bert
     num_samples:int=args.num_samples
     is_stair_captions:bool=args.is_stair_captions
+    mlm_weight:float=args.mlm_weight
+    moc_weight:float=args.moc_weight
+    mrfr_weight:float=args.mrfr_weight
+    itm_weight:float=args.itm_weight
 
     logger.info("sample_list_filepath: {}".format(sample_list_filepath))
     logger.info("input_ids_dir: {}".format(input_ids_dir))
@@ -286,6 +289,10 @@ def main(args):
     logger.info("lr: {}".format(lr))
     logger.info("weight_decay: {}".format(weight_decay))
     logger.info("num_samples: {}".format(num_samples))
+    logger.info("mlm_weight: {}".format(mlm_weight))
+    logger.info("moc_weight: {}".format(moc_weight))
+    logger.info("mrfr_weight: {}".format(mrfr_weight))
+    logger.info("itm_weight: {}".format(itm_weight))
 
     if os.path.exists(input_ids_dir)==False:
         raise RuntimeError("input_ids_dirが存在しません。")
@@ -367,6 +374,10 @@ def main(args):
             max_num_rois,
             roi_features_dim,
             is_stair_captions,
+            mlm_weight,
+            moc_weight,
+            mrfr_weight,
+            itm_weight,
             logging_steps=100
         )
         mean_total_loss=train_res["total_loss"]
@@ -406,6 +417,10 @@ if __name__=="__main__":
     parser.add_argument("--no_init_params_from_pretrained_bert",action="store_true")
     parser.add_argument("--num_samples",type=int,default=-1)
     parser.add_argument("--is_stair_captions",action="store_true")
+    parser.add_argument("--mlm_weight",type=float)
+    parser.add_argument("--moc_weight",type=float)
+    parser.add_argument("--mrfr_weight",type=float)
+    parser.add_argument("--itm_weight",type=float)
     args=parser.parse_args()
 
     main(args)
